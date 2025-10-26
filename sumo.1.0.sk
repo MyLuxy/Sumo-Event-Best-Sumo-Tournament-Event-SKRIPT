@@ -1,0 +1,558 @@
+# Sumo Event Script - Versione Automatica Completa
+# Sistema di torneo completamente automatico con freeze e inventari
+
+# Variabili iniziali
+on load:
+    set {sumo.active} to false
+    clear {sumo.players::*}
+    clear {sumo.queue::*}
+
+on join:
+    set {sumo.inEvent::%player%} to false
+    set {sumo.frozen::%player%} to false
+
+# Comandi per impostare le posizioni (solo admin)
+command /sumo-setspawn:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.spawn} to location of player
+            send "&aѕᴜᴍᴏ&8 |&r &2Spawn della modalità impostato!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+command /sumo-setpos1:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.pos1} to location of player
+            send "&aѕᴜᴍᴏ&8 |&r &2Posizione 1 dell'arena impostata!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+command /sumo-setpos2:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.pos2} to location of player
+            send "&aѕᴜᴍᴏ&8 |&r &2Posizione 2 dell'arena impostata!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+command /sumo-setlobby:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.lobby} to location of player
+            send "&aѕᴜᴍᴏ&8 |&r &2Lobby dell'arena impostata!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+command /sumo-setheight:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.minHeight} to y-coordinate of player
+            send "&aѕᴜᴍᴏ&8 |&r &2Altezza minima impostata a Y: %{sumo.minHeight}%" to player
+            send "&7I giocatori che cadono sotto questa altezza perdono!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+command /sumo-setregion <text>:
+    trigger:
+        if player has permission "sumo.admin":
+            set {sumo.region} to arg-1
+            send "&aѕᴜᴍᴏ&8 |&r &2Region WorldGuard impostata: &e%arg-1%" to player
+            send "&7Assicurati che la region abbia:" to player
+            send "&7- pvp: allow" to player
+            send "&7- invincible: deny" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+# Comando per avviare l'evento
+command /sumo-start:
+    trigger:
+        if player has permission "sumo.admin":
+            if {sumo.active} is false:
+                if {sumo.spawn} is set:
+                    if {sumo.pos1} is set:
+                        if {sumo.pos2} is set:
+                            if {sumo.lobby} is set:
+                                if {sumo.minHeight} is set:
+                                    set {sumo.active} to true
+                                    
+                                    # Admin entra automaticamente
+                                    saveInventory(player)
+                                    clear player's inventory
+                                    set {sumo.inEvent::%player%} to true
+                                    add player to {sumo.players::*}
+                                    add player to {sumo.queue::*}
+                                    teleport player to {sumo.lobby}
+                                    
+                                    # Annuncio evento CENTRATO
+                                    send "" to all players
+                                    send "                    &6&lSumo Event" to all players
+                                    send "" to all players
+                                    send "              &eEvento sumo avviato!" to all players
+                                    send "          &ePremio per il vincitore: &a$5,000" to all players
+                                    send "" to all players
+                                    send "         <tooltip:&6Clicca per unirti al torneo!><run command:/sumo-join>&7» &a&lClick Per Partecipare &7«" to all players
+                                    send "" to all players
+                                    
+                                    send "&aѕᴜᴍᴏ&8 |&r &aSei entrato automaticamente nell'evento come organizzatore!" to player
+                                else:
+                                    send "&aѕᴜᴍᴏ&8 |&r &cImposta prima l'altezza minima con /sumo-setheight!" to player
+                            else:
+                                send "&aѕᴜᴍᴏ&8 |&r &cImposta prima la lobby dell'arena!" to player
+                        else:
+                            send "&aѕᴜᴍᴏ&8 |&r &cImposta prima la posizione 2!" to player
+                    else:
+                        send "&aѕᴜᴍᴏ&8 |&r &cImposta prima la posizione 1!" to player
+                else:
+                    send "&aѕᴜᴍᴏ&8 |&r &cImposta prima lo spawn della modalità!" to player
+            else:
+                send "&aѕᴜᴍᴏ&8 |&r &cUn evento è già attivo!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+# Comando per terminare forzatamente l'evento
+command /sumo-end:
+    trigger:
+        if player has permission "sumo.admin":
+            if {sumo.active} is true:
+                set {sumo.active} to false
+                delete {sumo.currentMatch}
+                delete {sumo.player1}
+                delete {sumo.player2}
+                
+                loop {sumo.players::*}:
+                    restoreInventory(loop-value)
+                    set {sumo.inEvent::%loop-value%} to false
+                    set {sumo.frozen::%loop-value%} to false
+                    delete {sumo.frozenLoc::%loop-value%}
+                    teleport loop-value to {sumo.spawn}
+                
+                clear {sumo.players::*}
+                clear {sumo.queue::*}
+                
+                # Annuncio CENTRATO evento terminato
+                send "" to all players
+                send "                    &6&lSumo Event" to all players
+                send "" to all players
+                send "               &eL'evento è terminato!" to all players
+                send "" to all players
+                
+                send "&aѕᴜᴍᴏ&8 |&r &aEvento terminato con successo!" to player
+            else:
+                send "&aѕᴜᴍᴏ&8 |&r &cNessun evento attivo!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+# Funzione per salvare inventario
+function saveInventory(p: player):
+    loop 41 times:
+        set {_slot} to loop-number - 1
+        set {sumo.inv::%{_p}%::slot-%{_slot}%} to slot {_slot} of {_p}'s inventory
+    
+    set {sumo.inv::%{_p}%::helmet} to {_p}'s helmet
+    set {sumo.inv::%{_p}%::chestplate} to {_p}'s chestplate
+    set {sumo.inv::%{_p}%::leggings} to {_p}'s leggings
+    set {sumo.inv::%{_p}%::boots} to {_p}'s boots
+
+# Funzione per ripristinare inventario
+function restoreInventory(p: player):
+    clear {_p}'s inventory
+    loop 41 times:
+        set {_slot} to loop-number - 1
+        set slot {_slot} of {_p}'s inventory to {sumo.inv::%{_p}%::slot-%{_slot}%}
+        delete {sumo.inv::%{_p}%::slot-%{_slot}%}
+    
+    set {_p}'s helmet to {sumo.inv::%{_p}%::helmet}
+    set {_p}'s chestplate to {sumo.inv::%{_p}%::chestplate}
+    set {_p}'s leggings to {sumo.inv::%{_p}%::leggings}
+    set {_p}'s boots to {sumo.inv::%{_p}%::boots}
+    
+    delete {sumo.inv::%{_p}%::helmet}
+    delete {sumo.inv::%{_p}%::chestplate}
+    delete {sumo.inv::%{_p}%::leggings}
+    delete {sumo.inv::%{_p}%::boots}
+
+# Comando per unirsi all'evento
+command /sumo-join:
+    trigger:
+        if {sumo.active} is true:
+            if {sumo.inEvent::%player%} is false:
+                if {sumo.currentMatch} is not set:
+                    saveInventory(player)
+                    clear player's inventory
+                    
+                    set {sumo.inEvent::%player%} to true
+                    add player to {sumo.players::*}
+                    add player to {sumo.queue::*}
+                    teleport player to {sumo.lobby}
+                    send "&aѕᴜᴍᴏ&8 |&r &aSei entrato nell'evento! Attendi il tuo turno." to player
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &6%player% &eè entrato nell'evento! &7(%size of {sumo.players::*}% giocatori)"
+                else:
+                    send "&aѕᴜᴍᴏ&8 |&r &cNon puoi unirti durante un match!" to player
+            else:
+                send "&aѕᴜᴍᴏ&8 |&r &cSei già nell'evento!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNessun evento attivo al momento!" to player
+
+# Comando per uscire dall'evento
+command /sumo-leave:
+    trigger:
+        if {sumo.inEvent::%player%} is true:
+            restoreInventory(player)
+            
+            set {sumo.inEvent::%player%} to false
+            set {sumo.frozen::%player%} to false
+            remove player from {sumo.players::*}
+            remove player from {sumo.queue::*}
+            teleport player to {sumo.spawn}
+            send "&aѕᴜᴍᴏ&8 |&r &eSei uscito dall'evento!" to player
+            broadcast "&aѕᴜᴍᴏ&8 |&r &6%player% &eha abbandonato l'evento! &7(%size of {sumo.players::*}% giocatori)"
+            
+            if player is {sumo.player1}:
+                if {sumo.currentMatch} is set:
+                    set {_winner} to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &c%player% ha abbandonato il match!"
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &eVincitore per abbandono: &a%{_winner}%"
+                    set {sumo.frozen::%{_winner}%} to false
+                    add {_winner} to {sumo.queue::*}
+                    teleport {_winner} to {sumo.lobby}
+                    heal {_winner}
+                    clear {_winner}'s inventory
+                    delete {sumo.currentMatch}
+                    delete {sumo.player1}
+                    delete {sumo.player2}
+                    wait 3 seconds
+                    if {sumo.active} is true:
+                        execute console command "/sumo-automatch"
+            else if player is {sumo.player2}:
+                if {sumo.currentMatch} is set:
+                    set {_winner} to {sumo.player1}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &c%player% ha abbandonato il match!"
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &eVincitore per abbandono: &a%{_winner}%"
+                    set {sumo.frozen::%{_winner}%} to false
+                    add {_winner} to {sumo.queue::*}
+                    teleport {_winner} to {sumo.lobby}
+                    heal {_winner}
+                    clear {_winner}'s inventory
+                    delete {sumo.currentMatch}
+                    delete {sumo.player1}
+                    delete {sumo.player2}
+                    wait 3 seconds
+                    if {sumo.active} is true:
+                        execute console command "/sumo-automatch"
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon sei nell'evento!" to player
+
+# Comando per iniziare i match
+command /sumo-startmatches:
+    trigger:
+        if player has permission "sumo.admin":
+            if {sumo.active} is true:
+                if size of {sumo.queue::*} >= 2:
+                    if {sumo.currentMatch} is not set:
+                        send "&aѕᴜᴍᴏ&8 |&r &aTorneo avviato!" to player
+                        execute console command "/sumo-automatch"
+                    else:
+                        send "&aѕᴜᴍᴏ&8 |&r &cC'è già un match in corso!" to player
+                else:
+                    send "&aѕᴜᴍᴏ&8 |&r &cServono almeno 2 giocatori per iniziare!" to player
+            else:
+                send "&aѕᴜᴍᴏ&8 |&r &cNessun evento attivo!" to player
+        else:
+            send "&aѕᴜᴍᴏ&8 |&r &cNon hai il permesso!" to player
+
+# Comando AUTOMATICO per gestire i match
+command /sumo-automatch:
+    trigger:
+        if {sumo.active} is true:
+            if size of {sumo.queue::*} >= 2:
+                if {sumo.currentMatch} is not set:
+                    set {sumo.player1} to first element of {sumo.queue::*}
+                    remove {sumo.player1} from {sumo.queue::*}
+                    set {sumo.player2} to first element of {sumo.queue::*}
+                    remove {sumo.player2} from {sumo.queue::*}
+                    
+                    set {sumo.currentMatch} to true
+                    
+                    broadcast "&6&lSumo Match"
+                    broadcast "&e%{sumo.player1}% &6VS &e%{sumo.player2}%"
+                    broadcast "&7Il match inizia tra 5 secondi..."
+                    
+                    wait 3 seconds
+                    teleport {sumo.player1} to {sumo.pos1}
+                    teleport {sumo.player2} to {sumo.pos2}
+                    heal {sumo.player1}
+                    heal {sumo.player2}
+                    feed {sumo.player1}
+                    feed {sumo.player2}
+                    clear {sumo.player1}'s inventory
+                    clear {sumo.player2}'s inventory
+                    
+                    set {sumo.frozen::%{sumo.player1}%} to true
+                    set {sumo.frozen::%{sumo.player2}%} to true
+                    set {sumo.frozenLoc::%{sumo.player1}%} to location of {sumo.player1}
+                    set {sumo.frozenLoc::%{sumo.player2}%} to location of {sumo.player2}
+                    
+                    wait 1 second
+                    send title "&c&l5" with subtitle "&7Preparati..." to {sumo.player1} for 1 second
+                    send title "&c&l5" with subtitle "&7Preparati..." to {sumo.player2} for 1 second
+                    play sound "block.note_block.hat" with volume 1 and pitch 1 to {sumo.player1}
+                    play sound "block.note_block.hat" with volume 1 and pitch 1 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &cIl match inizia tra &45 secondi!"
+                    
+                    wait 1 second
+                    send title "&c&l4" with subtitle "&7Preparati..." to {sumo.player1} for 1 second
+                    send title "&c&l4" with subtitle "&7Preparati..." to {sumo.player2} for 1 second
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.2 to {sumo.player1}
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.2 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &cIl match inizia tra &44 secondi!"
+                    
+                    wait 1 second
+                    send title "&e&l3" with subtitle "&7Quasi pronto..." to {sumo.player1} for 1 second
+                    send title "&e&l3" with subtitle "&7Quasi pronto..." to {sumo.player2} for 1 second
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.4 to {sumo.player1}
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.4 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &cIl match inizia tra &43 secondi!"
+                    
+                    wait 1 second
+                    send title "&e&l2" with subtitle "&7Quasi pronto..." to {sumo.player1} for 1 second
+                    send title "&e&l2" with subtitle "&7Quasi pronto..." to {sumo.player2} for 1 second
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.6 to {sumo.player1}
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.6 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &cIl match inizia tra &42 secondi!"
+                    
+                    wait 1 second
+                    send title "&6&l1" with subtitle "&7Attento..." to {sumo.player1} for 1 second
+                    send title "&6&l1" with subtitle "&7Attento..." to {sumo.player2} for 1 second
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.8 to {sumo.player1}
+                    play sound "block.note_block.hat" with volume 1 and pitch 1.8 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &cIl match inizia tra &41 secondo!"
+                    
+                    wait 1 second
+                    send title "&a&lVIA!" with subtitle "&7Combatti!" to {sumo.player1} for 2 seconds
+                    send title "&a&lVIA!" with subtitle "&7Combatti!" to {sumo.player2} for 2 seconds
+                    play sound "entity.player.levelup" with volume 1 and pitch 1.5 to {sumo.player1}
+                    play sound "entity.player.levelup" with volume 1 and pitch 1.5 to {sumo.player2}
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &a&lVIA!"
+                    
+                    set {sumo.frozen::%{sumo.player1}%} to false
+                    set {sumo.frozen::%{sumo.player2}%} to false
+                    delete {sumo.frozenLoc::%{sumo.player1}%}
+                    delete {sumo.frozenLoc::%{sumo.player2}%}
+            else if size of {sumo.queue::*} = 1:
+                set {_winner} to first element of {sumo.queue::*}
+                
+                # Annuncio CENTRATO vincitore
+                send "" to all players
+                send "                 &6&lSumo Event - Finali" to all players
+                send "" to all players
+                send "            &eVincitore del torneo: &a&l%{_winner}%" to all players
+                send "                   &ePremo: &a$5,000" to all players
+                send "" to all players
+                send "" to all players
+                
+                send title "&6&l🏆 HAI VINTO! 🏆" with subtitle "&aCongratulazioni!" to {_winner} for 5 seconds
+                play sound "ui.toast.challenge_complete" with volume 1 and pitch 1 to {_winner}
+                execute console command "/economy give %{_winner}% 5000"
+                wait 5 seconds
+                
+                set {sumo.active} to false
+                delete {sumo.currentMatch}
+                delete {sumo.player1}
+                delete {sumo.player2}
+                loop {sumo.players::*}:
+                    restoreInventory(loop-value)
+                    set {sumo.inEvent::%loop-value%} to false
+                    set {sumo.frozen::%loop-value%} to false
+                    delete {sumo.frozenLoc::%loop-value%}
+                    teleport loop-value to {sumo.spawn}
+                clear {sumo.players::*}
+                clear {sumo.queue::*}
+
+# RILEVAMENTO CADUTA
+every tick:
+    if {sumo.currentMatch} is set:
+        if {sumo.player1} is set:
+            if y-coordinate of {sumo.player1} < {sumo.minHeight}:
+                set {_loser} to {sumo.player1}
+                set {_winner} to {sumo.player2}
+                execute console command "/sumo-endmatch %{_winner}% %{_loser}%"
+        
+        if {sumo.player2} is set:
+            if y-coordinate of {sumo.player2} < {sumo.minHeight}:
+                set {_loser} to {sumo.player2}
+                set {_winner} to {sumo.player1}
+                execute console command "/sumo-endmatch %{_winner}% %{_loser}%"
+
+# Comando interno per terminare il match
+command /sumo-endmatch <player> <player>:
+    trigger:
+        if {sumo.currentMatch} is set:
+            set {_winner} to arg-1
+            set {_loser} to arg-2
+            
+            set {sumo.frozen::%{_winner}%} to false
+            set {sumo.frozen::%{_loser}%} to false
+            delete {sumo.frozenLoc::%{_winner}%}
+            delete {sumo.frozenLoc::%{_loser}%}
+            
+            broadcast "&6&lSumo Match"
+            broadcast "&eVincitore: &a&l%{_winner}%"
+            broadcast "&eSconfitto: &c%{_loser}%"
+            
+            send title "&a&l🏆 VITTORIA! 🏆" with subtitle "&eHai vinto il round!" to {_winner} for 3 seconds
+            send title "&c&l❌ SCONFITTA! ❌" with subtitle "&eHai perso il round!" to {_loser} for 3 seconds
+            play sound "entity.player.levelup" with volume 1 and pitch 1 to {_winner}
+            play sound "entity.villager.no" with volume 1 and pitch 0.8 to {_loser}
+            
+            add {_winner} to {sumo.queue::*}
+            teleport {_winner} to {sumo.lobby}
+            heal {_winner}
+            clear {_winner}'s inventory
+            send "&aѕᴜᴍᴏ&8 |&r &aHai vinto! Attendi il prossimo match in lobby." to {_winner}
+            
+            teleport {_loser} to {sumo.lobby}
+            heal {_loser}
+            clear {_loser}'s inventory
+            send "&aѕᴜᴍᴏ&8 |&r &cHai perso! Puoi restare come spettatore o uscire con /sumo-leave" to {_loser}
+            
+            delete {sumo.currentMatch}
+            delete {sumo.player1}
+            delete {sumo.player2}
+            
+            wait 5 seconds
+            
+            if {sumo.active} is true:
+                if size of {sumo.queue::*} >= 2:
+                    broadcast "&aѕᴜᴍᴏ&8 |&r &eProssimo match tra 3 secondi..."
+                    wait 3 seconds
+                    execute console command "/sumo-automatch"
+                else if size of {sumo.queue::*} = 1:
+                    execute console command "/sumo-automatch"
+
+# Gestione morte
+on death of player:
+    if {sumo.currentMatch} is set:
+        if victim is {sumo.player1}:
+            set {_winner} to {sumo.player2}
+            set {_loser} to {sumo.player1}
+            execute console command "/sumo-endmatch %{_winner}% %{_loser}%"
+        else if victim is {sumo.player2}:
+            set {_winner} to {sumo.player1}
+            set {_loser} to {sumo.player2}
+            execute console command "/sumo-endmatch %{_winner}% %{_loser}%"
+
+# Gestione quit
+on quit:
+    if {sumo.inEvent::%player%} is true:
+        restoreInventory(player)
+        
+        if player is {sumo.player1}:
+            if {sumo.currentMatch} is set:
+                set {_winner} to {sumo.player2}
+                broadcast "&aѕᴜᴍᴏ&8 |&r &c%player% ha abbandonato il match!"
+                broadcast "&aѕᴜᴍᴏ&8 |&r &eVincitore per abbandono: &a%{_winner}%"
+                set {sumo.frozen::%{_winner}%} to false
+                delete {sumo.frozenLoc::%{_winner}%}
+                add {_winner} to {sumo.queue::*}
+                teleport {_winner} to {sumo.lobby}
+                heal {_winner}
+                clear {_winner}'s inventory
+                delete {sumo.currentMatch}
+                delete {sumo.player1}
+                delete {sumo.player2}
+                wait 3 seconds
+                if {sumo.active} is true:
+                    execute console command "/sumo-automatch"
+        else if player is {sumo.player2}:
+            if {sumo.currentMatch} is set:
+                set {_winner} to {sumo.player1}
+                broadcast "&aѕᴜᴍᴏ&8 |&r &c%player% ha abbandonato il match!"
+                broadcast "&aѕᴜᴍᴏ&8 |&r &eVincitore per abbandono: &a%{_winner}%"
+                set {sumo.frozen::%{_winner}%} to false
+                delete {sumo.frozenLoc::%{_winner}%}
+                add {_winner} to {sumo.queue::*}
+                teleport {_winner} to {sumo.lobby}
+                heal {_winner}
+                clear {_winner}'s inventory
+                delete {sumo.currentMatch}
+                delete {sumo.player1}
+                delete {sumo.player2}
+                wait 3 seconds
+                if {sumo.active} is true:
+                    execute console command "/sumo-automatch"
+        
+        set {sumo.inEvent::%player%} to false
+        set {sumo.frozen::%player%} to false
+        delete {sumo.frozenLoc::%player%}
+        remove player from {sumo.players::*}
+        remove player from {sumo.queue::*}
+
+# Blocco movimento durante freeze
+on player move:
+    if {sumo.frozen::%player%} is true:
+        if {sumo.frozenLoc::%player%} is set:
+            teleport player to {sumo.frozenLoc::%player%}
+
+#KnockBack CUSTOM
+options:
+    KNOCKBACK_H: 0.7
+    KNOCKBACK_V: 0.42
+    KNOCKBACK_V_LIMIT: 0.35
+    KNOCKBACK_EXTRA_H: 0.1
+    KNOCKBACK_EXTRA_V: 0.0
+
+on damage of player:
+    attacker is a entity
+    
+    set {_horizontal_force} to {@KNOCKBACK_H} + {@KNOCKBACK_EXTRA_H}
+    set {_vertical_force} to {@KNOCKBACK_V} + {@KNOCKBACK_EXTRA_V}
+
+    push victim in direction of attacker with force {_horizontal_force}
+    push victim up with force {_vertical_force}
+
+# Gestione danni - NESSUN DANNO ma KNOCKBACK VANILLA
+on damage:
+    if {sumo.inEvent::%victim%} is true:
+        if {sumo.currentMatch} is not set:
+            cancel event
+        else if {sumo.frozen::%victim%} is true:
+            cancel event
+        else:
+            if victim is {sumo.player1}:
+                set damage to 0
+            else if victim is {sumo.player2}:
+                set damage to 0
+            else:
+                cancel event
+    
+    if {sumo.frozen::%attacker%} is true:
+        cancel event
+
+# Prevenire drop/pickup
+on drop:
+    if {sumo.inEvent::%player%} is true:
+        cancel event
+
+on pickup:
+    if {sumo.inEvent::%player%} is true:
+        cancel event
+
+# Loop per annunci ripetuti evento (massimo 5 volte)
+every 20 seconds:
+    if {sumo.active} is true:
+        if {sumo.currentMatch} is not set:
+            if size of {sumo.players::*} > 0:
+                if {sumo.announcement.count} is not set:
+                    set {sumo.announcement.count} to 0
+                
+                if {sumo.announcement.count} < 5:
+                    add 1 to {sumo.announcement.count}
+                    send "" to all players
+                    send "                    &6&lSumo Event" to all players
+                    send "" to all players
+                    send "              &eEvento sumo in corso!" to all players
+                    send "          &ePremio per il vincitore: &a$5,000" to all players
+                    send "" to all players
+                    send "         <tooltip:&6Clicca per unirti al torneo!><run command:/sumo-join>&7» &a&lClick Per Partecipare &7«" to all players
+                    send "" to all players
